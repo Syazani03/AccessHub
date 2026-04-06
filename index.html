@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>User Dashboard</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial;
+      display: flex;
+    }
+
+    .sidebar {
+      width: 220px;
+      background: #1e293b;
+      color: white;
+      height: 100vh;
+      padding: 20px;
+    }
+
+    .sidebar h2 {
+      margin-bottom: 30px;
+    }
+
+    .sidebar button {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: none;
+      background: #334155;
+      color: white;
+      cursor: pointer;
+      border-radius: 6px;
+      text-align: left;
+    }
+
+    .sidebar button:hover {
+      background: #475569;
+    }
+
+    .sidebar button.active {
+      background: #3b82f6;
+    }
+
+    .logout-btn {
+      margin-top: 20px;
+      background: #ef4444 !important;
+    }
+
+    .main {
+      flex: 1;
+      padding: 20px;
+      background: #f1f5f9;
+    }
+
+    .card {
+      background: white;
+      padding: 15px;
+      margin-bottom: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+
+    .link-btn {
+      display: block;
+      padding: 10px;
+      margin-top: 10px;
+      background: #3b82f6;
+      color: white;
+      text-decoration: none;
+      border-radius: 5px;
+      text-align: center;
+    }
+
+    input {
+      padding: 10px;
+      width: 100%;
+      margin-bottom: 20px;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+
+    .empty {
+      text-align: center;
+      color: gray;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <h2>AccessHub</h2>
+
+  <!-- Dynamic buttons will be generated here -->
+
+  <button class="logout-btn" onclick="logout()">Logout</button>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <h2> AccessHub Dashboard</h2>
+
+  <input type="text" id="searchInput" placeholder="Search links...">
+
+  <div id="dashboard"></div>
+</div>
+
+<script>
+// ===============================
+// AUTH
+// ===============================
+const token = localStorage.getItem("token");
+
+if (!token) window.location.href = "login.html";
+
+const payload = JSON.parse(atob(token.split('.')[1]));
+
+if (payload.role === "admin") {
+  window.location.href = "admin.html";
+}
+
+let allData = [];
+
+// ===============================
+// LOAD LINKS
+// ===============================
+async function loadLinks() {
+  try {
+    const res = await fetch("http://localhost:3000/links", {
+      headers: { Authorization: "Bearer " + token }
+    });
+
+    const data = await res.json();
+
+    allData = data;
+
+    renderDashboard(allData);
+    generateSidebar(allData); //  generate buttons
+
+  } catch (err) {
+    console.error(err);
+  }
+}
+
+const data = await res.json();
+console.log("DATA FROM BACKEND:", data);
+
+// ===============================
+// RENDER
+// ===============================
+function renderDashboard(data) {
+  const container = document.getElementById("dashboard");
+  container.innerHTML = "";
+
+  if (data.length === 0) {
+    container.innerHTML = "<p class='empty'>No links available</p>";
+    return;
+  }
+
+  data.forEach(link => {
+    container.innerHTML += `
+      <div class="card">
+        <h4>${link.name}</h4>
+        <p><strong>${link.department_name}</strong></p>
+        <a href="${link.url}" target="_blank" class="link-btn">Open Link</a>
+      </div>
+    `;
+  });
+}
+
+// ===============================
+// SIDEBAR (DYNAMIC + ALL BUTTON)
+// ===============================
+function generateSidebar(data) {
+  const sidebar = document.querySelector(".sidebar");
+
+  // remove old buttons except logout
+  sidebar.querySelectorAll("button:not(.logout-btn)").forEach(btn => btn.remove());
+
+  // 🔥 ALL BUTTON
+  const allBtn = document.createElement("button");
+  allBtn.innerText = "All";
+
+  allBtn.onclick = () => {
+    setActive(allBtn);
+    renderDashboard(allData);
+  };
+
+  sidebar.insertBefore(allBtn, document.querySelector(".logout-btn"));
+
+  // unique departments
+  const categories = [...new Set(data.map(d => d.department_name))];
+
+  categories.forEach(cat => {
+    const btn = document.createElement("button");
+    btn.innerText = cat;
+
+    btn.onclick = () => {
+      setActive(btn);
+      filterCategory(cat);
+    };
+
+    sidebar.insertBefore(btn, document.querySelector(".logout-btn"));
+  });
+}
+
+// ===============================
+// FILTER
+// ===============================
+function filterCategory(category) {
+  const filtered = allData.filter(item => item.department_name === category);
+  renderDashboard(filtered);
+}
+
+// ===============================
+// ACTIVE BUTTON
+// ===============================
+function setActive(button) {
+  document.querySelectorAll(".sidebar button").forEach(btn => {
+    btn.classList.remove("active");
+  });
+  button.classList.add("active");
+}
+
+// ===============================
+// SEARCH
+// ===============================
+document.getElementById("searchInput").addEventListener("keyup", function () {
+  const keyword = this.value.toLowerCase();
+
+  const filtered = allData.filter(item =>
+    item.name.toLowerCase().includes(keyword)
+  );
+
+  renderDashboard(filtered);
+});
+
+// ===============================
+// LOGOUT
+// ===============================
+function logout() {
+  localStorage.removeItem("token");
+  window.location.href = "login.html";
+}
+
+// INIT
+loadLinks();
+</script>
+
+</body>
+</html>

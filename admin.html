@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Admin Dashboard</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial;
+      display: flex;
+    }
+
+    .sidebar {
+      width: 220px;
+      background: #1e3a8a;
+      color: white;
+      height: 100vh;
+      padding: 20px;
+    }
+
+    .sidebar button {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: none;
+      background: #3b82f6;
+      color: white;
+      cursor: pointer;
+      border-radius: 6px;
+      text-align: left;
+    }
+
+    .logout {
+      background: #ef4444 !important;
+      margin-top: 20px;
+    }
+
+    .main {
+      flex: 1;
+      padding: 20px;
+      background: #f1f5f9;
+    }
+
+    .card {
+      background: white;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 10px;
+    }
+
+    input, select {
+      padding: 10px;
+      width: 100%;
+      margin-bottom: 10px;
+    }
+
+    .btn {
+      padding: 10px;
+      background: #3b82f6;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    table {
+      width: 100%;
+      margin-top: 15px;
+      border-collapse: collapse;
+    }
+
+    th {
+      background: #3b82f6;
+      color: white;
+      padding: 10px;
+    }
+
+    td {
+      padding: 10px;
+      border-bottom: 1px solid #ddd;
+    }
+
+    .hidden {
+      display: none;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #22c55e;
+      color: white;
+      padding: 10px;
+      border-radius: 5px;
+    }
+
+    .toast.hidden {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <h2>AccessHub</h2>
+
+  <button onclick="showSection('users')">👤 Users</button>
+  <button onclick="showSection('links')">🔗 Links</button>
+
+  <button class="logout" onclick="logout()">Logout</button>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <h2>Admin Dashboard</h2>
+
+  <!-- USERS -->
+  <div id="usersSection" class="card">
+    <h3>User Management</h3>
+
+    <input id="email" placeholder="Email">
+    <input id="password" placeholder="Password">
+
+    <select id="role">
+      <option value="user">User</option>
+      <option value="admin">Admin</option>
+    </select>
+
+    <button class="btn" onclick="createUser()">Create User</button>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="userTable"></tbody>
+    </table>
+  </div>
+
+  <!-- LINKS -->
+  <div id="linksSection" class="card hidden">
+    <h3>Link Management</h3>
+
+    <input id="linkName" placeholder="Link Name">
+    <input id="linkURL" placeholder="https://example.com">
+
+    <select id="linkDept"></select>
+
+    <button class="btn" onclick="addLink()">Add Link</button>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Department</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="linkTable"></tbody>
+    </table>
+  </div>
+
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script>
+// ===============================
+// AUTH CHECK
+// ===============================
+let token = localStorage.getItem("token");
+
+console.log("TOKEN:", token);
+
+if (!token) {
+  alert("Please login first");
+  window.location.href = "login.html";
+}
+
+// ===============================
+// SWITCH SECTION
+// ===============================
+function showSection(section) {
+  document.getElementById("usersSection").classList.add("hidden");
+  document.getElementById("linksSection").classList.add("hidden");
+
+  document.getElementById(section + "Section").classList.remove("hidden");
+}
+
+// ===============================
+// LOGOUT
+// ===============================
+function logout() {
+  localStorage.removeItem("token");
+  window.location.href = "login.html";
+}
+
+// ===============================
+// TOAST
+// ===============================
+function showToast(msg) {
+  const t = document.getElementById("toast");
+  t.innerText = msg;
+  t.classList.remove("hidden");
+  setTimeout(() => t.classList.add("hidden"), 2000);
+}
+
+// ===============================
+// LOAD USERS
+// ===============================
+async function loadUsers() {
+  const res = await fetch("http://localhost:3000/api/users", {
+    headers: { Authorization: "Bearer " + token }
+  });
+
+  const data = await res.json();
+
+  const table = document.getElementById("userTable");
+  table.innerHTML = "";
+
+  data.forEach(u => {
+    table.innerHTML += `
+      <tr>
+        <td>${u.email}</td>
+        <td>${u.role}</td>
+        <td>
+          <button onclick="deleteUser(${u.id})">Delete</button>
+        </td>
+      </tr>
+    `;
+  });
+}
+
+// ===============================
+// LOAD LINKS (🔥 FIXED)
+// ===============================
+async function loadLinks() {
+  try {
+    const res = await fetch("http://localhost:3000/links", {
+      headers: {
+        Authorization: "Bearer " + token
+      }
+    });
+
+    console.log("STATUS:", res.status);
+
+    if (!res.ok) {
+      console.error("Unauthorized or error");
+      return;
+    }
+
+    const data = await res.json();
+    console.log("LINK DATA:", data);
+
+    const table = document.getElementById("linkTable");
+    table.innerHTML = "";
+
+    data.forEach(l => {
+      table.innerHTML += `
+        <tr>
+          <td>${l.name}</td>
+          <td>${l.department_name}</td>
+          <td>
+            <a href="${l.url}" target="_blank">Open</a>
+            <button onclick="deleteLink(${l.id})">Delete</button>
+          </td>
+        </tr>
+      `;
+    });
+
+  } catch (err) {
+    console.error("Error:", err);
+  }
+}
+
+// ===============================
+// LOAD DEPARTMENTS
+// ===============================
+async function loadDepartments() {
+  const res = await fetch("http://localhost:3000/departments");
+
+  const data = await res.json();
+
+  const select = document.getElementById("linkDept");
+  select.innerHTML = "";
+
+  data.forEach(d => {
+    select.innerHTML += `<option value="${d.id}">${d.name}</option>`;
+  });
+}
+
+// ===============================
+// CREATE USER
+// ===============================
+async function createUser() {
+  const email = document.getElementById("email").value;
+  const password = document.getElementById("password").value;
+  const role = document.getElementById("role").value;
+
+  await fetch("http://localhost:3000/api/users", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + token
+    },
+    body: JSON.stringify({ email, password, role })
+  });
+
+  showToast("User created!");
+  loadUsers();
+}
+
+// ===============================
+// ADD LINK
+// ===============================
+async function addLink() {
+  const name = document.getElementById("linkName").value;
+  const url = document.getElementById("linkURL").value;
+  const department_id = document.getElementById("linkDept").value;
+
+  if (!name || !url) {
+    showToast("Fill all fields");
+    return;
+  }
+
+  await fetch("http://localhost:3000/links", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + token
+    },
+    body: JSON.stringify({ name, url, department_id })
+  });
+
+  showToast("Link added!");
+
+  document.getElementById("linkName").value = "";
+  document.getElementById("linkURL").value = "";
+
+  loadLinks();
+}
+
+// ===============================
+// DELETE
+// ===============================
+async function deleteUser(id) {
+  await fetch(`http://localhost:3000/api/users/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: "Bearer " + token }
+  });
+
+  showToast("User deleted!");
+  loadUsers();
+}
+
+async function deleteLink(id) {
+  await fetch(`http://localhost:3000/links/${id}`, {
+    method: "DELETE",
+    headers: { Authorization: "Bearer " + token }
+  });
+
+  showToast("Link deleted!");
+  loadLinks();
+}
+
+// ===============================
+// INIT
+// ===============================
+loadUsers();
+loadLinks();
+loadDepartments();
+</script>
+
+</body>
+</html>
