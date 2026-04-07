@@ -1,86 +1,370 @@
-const express = require("express");
-const router = express.Router();
-const db = require("../db");
-const bcrypt = require("bcryptjs");
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Dashboard</title>
 
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", sans-serif;
+      display: flex;
+      background: #f1f5f9;
+    }
 
-// ✅ GET USERS (JOIN departments)
-router.get("/", async (req, res) => {
-  const [rows] = await db.query(`
-    SELECT 
-      users.id,
-      users.email,
-      users.role,
-      GROUP_CONCAT(departments.name) AS departments
-    FROM users
-    LEFT JOIN user_departments 
-      ON users.id = user_departments.user_id
-    LEFT JOIN departments 
-      ON departments.id = user_departments.department_id
-    GROUP BY users.id
-  `);
+    .sidebar {
+      width: 220px;
+      background: #1e293b;
+      color: white;
+      height: 100vh;
+      padding: 20px;
+    }
 
-  res.json(rows);
-});
+    .sidebar button {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: none;
+      background: #334155;
+      color: white;
+      cursor: pointer;
+      border-radius: 6px;
+    }
 
+    .sidebar button:hover {
+      background: #475569;
+    }
 
-// ✅ CREATE USER
-router.post("/", async (req, res) => {
-  const { email, password, role, departments } = req.body;
+    .main {
+      flex: 1;
+      padding: 20px;
+    }
 
-  // check duplicate email
-  const [existing] = await db.query("SELECT * FROM users WHERE email = ?", [email]);
-  if (existing.length > 0) {
-    return res.status(400).json({ message: "Email already exists" });
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      width: 100%;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+
+    button.primary {
+      background: #3b82f6;
+      color: white;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .section {
+      display: none;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th, td {
+      padding: 10px;
+      border: 1px solid #ddd;
+    }
+
+    th {
+      background: #e2e8f0;
+    }
+
+    td button {
+      padding: 5px 8px;
+      margin-right: 5px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    td button:first-child {
+      background: orange;
+      color: white;
+    }
+
+    td button:last-child {
+      background: red;
+      color: white;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <h2>Admin</h2>
+    <button onclick="showSection('usersSection')">Users</button>
+    <button onclick="showSection('linksSection')">Links</button>
+    <button onclick="logout()" style="background:red;">Logout</button>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- USERS -->
+    <div id="usersSection" class="section">
+
+      <div class="card">
+        <h3 id="formTitle">Create User</h3>
+
+        <input type="email" id="email" placeholder="Email">
+        <input type="password" id="password" placeholder="Password">
+
+        <select id="role">
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+        </select>
+
+        <h4>Departments</h4>
+        <div id="departmentCheckboxes"></div>
+
+        <button class="primary" onclick="createUser()">Create User</button>
+      </div>
+
+      <div class="card">
+        <h3>Users List</h3>
+        <table id="userTable">
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Departments</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <!-- LINKS -->
+    <div id="linksSection" class="section">
+
+      <div class="card">
+        <h3>Add Link</h3>
+
+        <input type="text" id="linkName" placeholder="Link Name">
+        <input type="text" id="linkURL" placeholder="URL">
+
+        <select id="linkDepartment"></select>
+
+        <button class="primary" onclick="createLink()">Add Link</button>
+      </div>
+
+      <div class="card">
+        <h3>Links List</h3>
+
+        <table id="linkTable">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>URL</th>
+              <th>Department</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+    </div>
+
+  </div>
+
+<script>
+
+  // 🔐 Protect
+  const role = localStorage.getItem("role");
+  if (!role || role !== "admin") {
+    alert("Access denied");
+    window.location.href = "login.html";
   }
 
-  const hashedPassword = await bcrypt.hash(password, 10);
-
-  const [result] = await db.query(
-    "INSERT INTO users (email, password, role) VALUES (?, ?, ?)",
-    [email, hashedPassword, role]
-  );
-
-  const userId = result.insertId;
-
-  // insert departments
-  for (let depId of departments) {
-    await db.query(
-      "INSERT INTO user_departments (user_id, department_id) VALUES (?, ?)",
-      [userId, depId]
-    );
+  function logout() {
+    localStorage.clear();
+    window.location.href = "login.html";
   }
 
-  res.json({ message: "User created" });
-});
-
-
-// ✅ DELETE USER
-router.delete("/:id", async (req, res) => {
-  const userId = req.params.id;
-
-  await db.query("DELETE FROM user_departments WHERE user_id = ?", [userId]);
-  await db.query("DELETE FROM users WHERE id = ?", [userId]);
-
-  res.json({ message: "User deleted" });
-});
-
-
-// ✅ UPDATE USER DEPARTMENTS
-router.put("/:id", async (req, res) => {
-  const userId = req.params.id;
-  const { departments } = req.body;
-
-  await db.query("DELETE FROM user_departments WHERE user_id = ?", [userId]);
-
-  for (let depId of departments) {
-    await db.query(
-      "INSERT INTO user_departments (user_id, department_id) VALUES (?, ?)",
-      [userId, depId]
-    );
+  function showSection(id) {
+    document.querySelectorAll(".section").forEach(sec => {
+      sec.style.display = "none";
+    });
+    document.getElementById(id).style.display = "block";
   }
 
-  res.json({ message: "User updated" });
-});
+  // LOAD DEPARTMENTS
+  async function loadDepartments() {
+    const res = await fetch("http://localhost:3000/api/departments");
+    const data = await res.json();
 
-module.exports = router;
+    const checkbox = document.getElementById("departmentCheckboxes");
+    const dropdown = document.getElementById("linkDepartment");
+
+    checkbox.innerHTML = "";
+    dropdown.innerHTML = "";
+
+    data.forEach(dep => {
+      checkbox.innerHTML += `
+        <label>
+          <input type="checkbox" value="${dep.id}">
+          ${dep.name}
+        </label>
+      `;
+
+      dropdown.innerHTML += `
+        <option value="${dep.id}">${dep.name}</option>
+      `;
+    });
+  }
+
+  // LOAD USERS
+  async function loadUsers() {
+    const res = await fetch("http://localhost:3000/api/users");
+    const users = await res.json();
+
+    const tbody = document.querySelector("#userTable tbody");
+    tbody.innerHTML = "";
+
+    users.forEach(user => {
+      tbody.innerHTML += `
+        <tr>
+          <td>${user.email}</td>
+          <td>${user.role}</td>
+          <td>${user.departments || "-"}</td>
+          <td>
+            <button onclick="editUser(${user.id})">Edit</button>
+            <button onclick="deleteUser(${user.id})">Delete</button>
+          </td>
+        </tr>
+      `;
+    });
+  }
+
+  async function deleteUser(id) {
+    if (!confirm("Delete user?")) return;
+
+    await fetch(`http://localhost:3000/api/users/${id}`, {
+      method: "DELETE"
+    });
+
+    loadUsers();
+  }
+
+  let editingUserId = null;
+
+  function editUser(id) {
+    editingUserId = id;
+    alert("Select departments and click Update");
+  }
+
+  async function createUser() {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    const role = document.getElementById("role").value;
+
+    const deps = [];
+    document.querySelectorAll("#departmentCheckboxes input:checked")
+      .forEach(cb => deps.push(cb.value));
+
+    if (!email || !password) return alert("Fill all");
+
+    if (editingUserId) {
+      await fetch(`http://localhost:3000/api/users/${editingUserId}`, {
+        method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ departments: deps })
+      });
+
+      alert("Updated");
+      editingUserId = null;
+      loadUsers();
+      return;
+    }
+
+    await fetch("http://localhost:3000/api/users", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ email, password, role, departments: deps })
+    });
+
+    alert("User created");
+    loadUsers();
+  }
+
+  // LINKS
+  async function createLink() {
+    const name = document.getElementById("linkName").value;
+    const url = document.getElementById("linkURL").value;
+    const department_id = document.getElementById("linkDepartment").value;
+
+    if (!name || !url) return alert("Fill all");
+
+    await fetch("http://localhost:3000/api/links", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ name, url, department_id })
+    });
+
+    alert("Link created");
+    loadLinks();
+  }
+
+  async function loadLinks() {
+    const res = await fetch("http://localhost:3000/api/links");
+    const links = await res.json();
+
+    const tbody = document.querySelector("#linkTable tbody");
+    tbody.innerHTML = "";
+
+    links.forEach(link => {
+      tbody.innerHTML += `
+        <tr>
+          <td>${link.name}</td>
+          <td><a href="${link.url}" target="_blank">Open</a></td>
+          <td>${link.department_name}</td>
+          <td>
+            <button onclick="deleteLink(${link.id})">Delete</button>
+          </td>
+        </tr>
+      `;
+    });
+  }
+
+  async function deleteLink(id) {
+    if (!confirm("Delete link?")) return;
+
+    await fetch(`http://localhost:3000/api/links/${id}`, {
+      method: "DELETE"
+    });
+
+    loadLinks();
+  }
+
+  // INIT
+  document.addEventListener("DOMContentLoaded", () => {
+    showSection("usersSection");
+    loadDepartments();
+    loadUsers();
+    loadLinks();
+  });
+
+</script>
+
+</body>
+</html>
