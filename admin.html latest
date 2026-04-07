@@ -1,0 +1,86 @@
+const express = require("express");
+const router = express.Router();
+const db = require("../db");
+const bcrypt = require("bcryptjs");
+
+
+// ✅ GET USERS (JOIN departments)
+router.get("/", async (req, res) => {
+  const [rows] = await db.query(`
+    SELECT 
+      users.id,
+      users.email,
+      users.role,
+      GROUP_CONCAT(departments.name) AS departments
+    FROM users
+    LEFT JOIN user_departments 
+      ON users.id = user_departments.user_id
+    LEFT JOIN departments 
+      ON departments.id = user_departments.department_id
+    GROUP BY users.id
+  `);
+
+  res.json(rows);
+});
+
+
+// ✅ CREATE USER
+router.post("/", async (req, res) => {
+  const { email, password, role, departments } = req.body;
+
+  // check duplicate email
+  const [existing] = await db.query("SELECT * FROM users WHERE email = ?", [email]);
+  if (existing.length > 0) {
+    return res.status(400).json({ message: "Email already exists" });
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  const [result] = await db.query(
+    "INSERT INTO users (email, password, role) VALUES (?, ?, ?)",
+    [email, hashedPassword, role]
+  );
+
+  const userId = result.insertId;
+
+  // insert departments
+  for (let depId of departments) {
+    await db.query(
+      "INSERT INTO user_departments (user_id, department_id) VALUES (?, ?)",
+      [userId, depId]
+    );
+  }
+
+  res.json({ message: "User created" });
+});
+
+
+// ✅ DELETE USER
+router.delete("/:id", async (req, res) => {
+  const userId = req.params.id;
+
+  await db.query("DELETE FROM user_departments WHERE user_id = ?", [userId]);
+  await db.query("DELETE FROM users WHERE id = ?", [userId]);
+
+  res.json({ message: "User deleted" });
+});
+
+
+// ✅ UPDATE USER DEPARTMENTS
+router.put("/:id", async (req, res) => {
+  const userId = req.params.id;
+  const { departments } = req.body;
+
+  await db.query("DELETE FROM user_departments WHERE user_id = ?", [userId]);
+
+  for (let depId of departments) {
+    await db.query(
+      "INSERT INTO user_departments (user_id, department_id) VALUES (?, ?)",
+      [userId, depId]
+    );
+  }
+
+  res.json({ message: "User updated" });
+});
+
+module.exports = router;
