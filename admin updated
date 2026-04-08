@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Dashboard</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: "Segoe UI", sans-serif;
+      background: #f1f5f9;
+      overflow-x: hidden;
+    }
+
+    .sidebar {
+      width: 220px;
+      min-width: 220px;
+      background: #1e293b;
+      color: white;
+      padding: 20px;
+
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 100%;
+
+      box-sizing: border-box;
+
+      box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+    }
+
+    .sidebar button {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: none;
+      background: #334155;
+      color: white;
+      cursor: pointer;
+      border-radius: 6px;
+    }
+
+    .sidebar button:hover {
+      background: #475569;
+    }
+
+    .sidebar h2 {
+    margin-bottom: 20px;
+    }
+
+    .sidebar button {
+    transition: 0.2s;
+    }
+
+    .sidebar button:hover {
+    transform: translateX(3px);
+    }
+
+    body{
+      overflow-y: auto;
+    }
+
+    .main {
+      margin-left: 220px;
+      padding: 20px;
+      width: calc(100% - 220px);
+      box-sizing: border-box;
+    }
+
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      width: 100%;
+      max-width: 1200px;
+      margin-bottom: 30PX;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 6px;
+      border: 1px solid #ccc;
+    }
+
+    button.primary {
+      background: #3b82f6;
+      color: white;
+      padding: 10px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .section {
+      display: none;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .table-container{
+      overflow-x: auto;
+    }
+
+    th, td {
+      padding: 10px;
+      border: 1px solid #ddd;
+    }
+
+    th {
+      background: #e2e8f0;
+    }
+
+    td button {
+      padding: 5px 8px;
+      margin-right: 5px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    td button:first-child {
+      background: orange;
+      color: white;
+    }
+
+    td button:last-child {
+      background: red;
+      color: white;
+    }
+
+    @media (max-width: 768px) {
+    .sidebar {
+    width: 180px;
+    min-width: 180px;
+    }
+
+    input, select {
+    width: 300px;   /* ✅ SAME SIZE */
+    max-width: 100%;
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 6px;
+  border: 1px solid #ccc;
+}
+    .main {
+    margin-left: 180px;
+    width: calc(100% - 180px);
+    }
+  }
+  </style>
+</head>
+<body>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <h2>Admin</h2>
+    <button onclick="showSection('usersSection')">Users</button>
+    <button onclick="showSection('linksSection')">Links</button>
+    <button onclick="logout()" style="background:red;">Logout</button>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+
+    <!-- USERS -->
+    <div id="usersSection" class="section">
+
+      <div class="card">
+        <h3 id="formTitle">Create User</h3>
+
+        <input type="email" id="email" placeholder="Email">
+        <input type="password" id="password" placeholder="Password">
+
+        <select id="role">
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+        </select>
+
+        <h4>Departments</h4>
+        <div id="departmentCheckboxes"></div>
+
+        <button class="primary" onclick="createUser()">Create User</button>
+      </div>
+
+      <div class="card">
+        <h3>Users List</h3>
+        <table id="userTable">
+          <thead>
+            <tr>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Departments</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+    </div>
+
+    <!-- LINKS -->
+    <div id="linksSection" class="section">
+
+      <div class="card">
+        <h3>Add Link</h3>
+
+        <input type="text" id="linkName" placeholder="Link Name">
+        <input type="text" id="linkURL" placeholder="URL">
+
+        <select id="linkDepartment"></select>
+
+        <button class="primary" onclick="createLink()">Add Link</button>
+      </div>
+
+      <div class="card">
+        <h3>Links List</h3>
+
+        <table id="linkTable">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>URL</th>
+              <th>Department</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+    </div>
+
+  </div>
+
+<script>
+
+  // 🔐 Protect
+  const role = localStorage.getItem("role");
+  if (!role || role !== "admin") {
+    alert("Access denied");
+    window.location.href = "login.html";
+  }
+
+  function logout() {
+    localStorage.clear();
+    window.location.href = "login.html";
+  }
+
+  function showSection(id) {
+    document.querySelectorAll(".section").forEach(sec => {
+      sec.style.display = "none";
+    });
+    document.getElementById(id).style.display = "block";
+  }
+
+  // LOAD DEPARTMENTS
+  async function loadDepartments() {
+    const res = await fetch("http://localhost:3000/api/departments");
+    const data = await res.json();
+
+    const checkbox = document.getElementById("departmentCheckboxes");
+    const dropdown = document.getElementById("linkDepartment");
+
+    checkbox.innerHTML = "";
+    dropdown.innerHTML = "";
+
+    data.forEach(dep => {
+      checkbox.innerHTML += `
+        <label>
+          <input type="checkbox" value="${dep.id}">
+          ${dep.name}
+        </label>
+      `;
+
+      dropdown.innerHTML += `
+        <option value="${dep.id}">${dep.name}</option>
+      `;
+    });
+  }
+
+  // LOAD USERS
+  async function loadUsers() {
+    const res = await fetch("http://localhost:3000/api/users");
+    const users = await res.json();
+
+    const tbody = document.querySelector("#userTable tbody");
+    tbody.innerHTML = "";
+
+    users.forEach(user => {
+      tbody.innerHTML += `
+        <tr>
+          <td>${user.email}</td>
+          <td>${user.role}</td>
+          <td>${user.departments || "-"}</td>
+          <td>
+            <button onclick="editUser(${user.id})">Edit</button>
+            <button onclick="deleteUser(${user.id})">Delete</button>
+          </td>
+        </tr>
+      `;
+    });
+  }
+
+  async function deleteUser(id) {
+    if (!confirm("Delete user?")) return;
+
+    await fetch(`http://localhost:3000/api/users/${id}`, {
+      method: "DELETE"
+    });
+
+    loadUsers();
+  }
+
+  let editingUserId = null;
+
+  function editUser(id) {
+    editingUserId = id;
+    alert("Select departments and click Update");
+  }
+
+  async function createUser() {
+    const email = document.getElementById("email").value;
+    const password = document.getElementById("password").value;
+    const role = document.getElementById("role").value;
+
+    const deps = [];
+    document.querySelectorAll("#departmentCheckboxes input:checked")
+      .forEach(cb => deps.push(cb.value));
+
+    if (!email || !password) return alert("Fill all");
+
+    if (editingUserId) {
+      await fetch(`http://localhost:3000/api/users/${editingUserId}`, {
+        method: "PUT",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ departments: deps })
+      });
+
+      alert("Updated");
+      editingUserId = null;
+      loadUsers();
+      return;
+    }
+
+    await fetch("http://localhost:3000/api/users", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ email, password, role, departments: deps })
+    });
+
+    alert("User created");
+    loadUsers();
+  }
+
+  // LINKS
+  async function createLink() {
+    const name = document.getElementById("linkName").value;
+    const url = document.getElementById("linkURL").value;
+    const department_id = document.getElementById("linkDepartment").value;
+
+    if (!name || !url) return alert("Fill all");
+
+    await fetch("http://localhost:3000/api/links", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ name, url, department_id })
+    });
+
+    alert("Link created");
+    loadLinks();
+  }
+
+  async function loadLinks() {
+    const res = await fetch("http://localhost:3000/api/links");
+    const links = await res.json();
+
+    const tbody = document.querySelector("#linkTable tbody");
+    tbody.innerHTML = "";
+
+    links.forEach(link => {
+      tbody.innerHTML += `
+        <tr>
+          <td>${link.name}</td>
+          <td><a href="${link.url}" target="_blank">Open</a></td>
+          <td>${link.department_name}</td>
+          <td>
+            <button onclick="deleteLink(${link.id})">Delete</button>
+          </td>
+        </tr>
+      `;
+    });
+  }
+
+  async function deleteLink(id) {
+    if (!confirm("Delete link?")) return;
+
+    await fetch(`http://localhost:3000/api/links/${id}`, {
+      method: "DELETE"
+    });
+
+    loadLinks();
+  }
+
+  // INIT
+  document.addEventListener("DOMContentLoaded", () => {
+    showSection("usersSection");
+    loadDepartments();
+    loadUsers();
+    loadLinks();
+  });
+
+</script>
+
+</body>
+</html>
